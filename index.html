@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ระบบโหวต</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6fb; --card:#ffffff; --ink:#1c2333; --muted:#5b6880; --line:#dde3ee;
+  --brand:#3b5bdb; --brand-ink:#ffffff; --soft:#e9eeff; --ok:#1f8a5b; --ok-soft:#e1f5ec;
+  --off:#5b6880; --off-soft:#eceff5; --danger:#c92a2a; --danger-soft:#fdeaea;
+  --shadow:0 2px 14px rgba(28,35,51,.07); --r:18px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#11141c; --card:#1b2030; --ink:#eef1f8; --muted:#9ba8c0; --line:#2b3349;
+    --brand:#8aa2ff; --brand-ink:#0f1220; --soft:#232b47; --ok:#4cc58f; --ok-soft:#173326;
+    --off:#9ba8c0; --off-soft:#252b3d; --danger:#ff8787; --danger-soft:#3a2024; --shadow:none; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11141c; --card:#1b2030; --ink:#eef1f8; --muted:#9ba8c0; --line:#2b3349;
+  --brand:#8aa2ff; --brand-ink:#0f1220; --soft:#232b47; --ok:#4cc58f; --ok-soft:#173326;
+  --off:#9ba8c0; --off-soft:#252b3d; --danger:#ff8787; --danger-soft:#3a2024; --shadow:none; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{font-size:18px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans Thai',system-ui,sans-serif;line-height:1.6;-webkit-text-size-adjust:100%}
+button,input,textarea{font:inherit;color:inherit}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px 64px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:1.25rem}
+.brand .logo{width:44px;height:44px;border-radius:14px;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-size:1.4rem}
+.chip{display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--muted)}
+.chip img{width:34px;height:34px;border-radius:50%}
+h1{font-size:1.9rem;line-height:1.3;margin:.2em 0 .3em;font-weight:800}
+h2{font-size:1.35rem;margin:0 0 .6em;font-weight:800}
+p.lead{color:var(--muted);margin:.2em 0 1em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:24px;box-shadow:var(--shadow);margin-bottom:18px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.row.between{justify-content:space-between}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 22px;border-radius:14px;border:2px solid var(--line);background:var(--card);cursor:pointer;font-weight:600;transition:transform .08s,background .15s}
+.btn:hover{background:var(--soft)}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.btn.primary:hover{filter:brightness(1.08);background:var(--brand)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.big{min-height:64px;font-size:1.15rem;padding:0 30px;border-radius:16px}
+.btn.sm{min-height:42px;padding:0 14px;font-size:.9rem;border-radius:12px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.badge{display:inline-block;padding:2px 12px;border-radius:99px;font-size:.8rem;font-weight:600}
+.badge.open{background:var(--ok-soft);color:var(--ok)}
+.badge.closed{background:var(--off-soft);color:var(--off)}
+label.f{display:block;font-weight:600;margin:0 0 6px}
+.in{width:100%;min-height:56px;padding:12px 16px;border-radius:14px;border:2px solid var(--line);background:var(--bg);font-size:1.05rem}
+.in:focus{border-color:var(--brand);outline:none}
+textarea.in{min-height:96px;resize:vertical}
+.field{margin-bottom:18px}
+.optrow{display:flex;gap:10px;margin-bottom:10px;align-items:center}
+.optrow .num{width:38px;height:38px;border-radius:50%;background:var(--soft);color:var(--brand);display:grid;place-items:center;font-weight:800;flex:none}
+.pollcard{cursor:pointer;text-align:left;width:100%;padding:20px;border-radius:var(--r);border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow)}
+.pollcard:hover{border-color:var(--brand)}
+.pollcard h3{margin:8px 0 4px;font-size:1.15rem}
+.pollcard small{color:var(--muted)}
+.tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.tab{min-height:48px;padding:0 20px;border-radius:99px;border:2px solid var(--line);background:var(--card);cursor:pointer;font-weight:600}
+.tab[aria-selected="true"]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.stats{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:18px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+.stat .k{color:var(--muted);font-size:.85rem}
+.stat .v{font-size:2.2rem;font-weight:800;line-height:1.2}
+.stat .v.sm{font-size:1.3rem}
+.bar{margin-bottom:18px}
+.bar .top{display:flex;justify-content:space-between;gap:12px;font-weight:600;margin-bottom:6px}
+.bar .track{height:30px;border-radius:10px;background:var(--off-soft);overflow:hidden}
+.bar .fill{height:100%;border-radius:10px;transition:width .5s ease;min-width:0}
+.bar .pct{color:var(--muted);font-weight:400;white-space:nowrap}
+table.t{width:100%;border-collapse:collapse;font-size:.95rem}
+table.t th,table.t td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+table.t th{color:var(--muted);font-weight:600;font-size:.85rem}
+.qrbox{background:#fff;padding:18px;border-radius:20px;display:inline-block;line-height:0}
+.qrbox img,.qrbox canvas{max-width:100%;height:auto}
+.center{text-align:center}
+.linkbox{display:flex;gap:10px;flex-wrap:wrap}
+.linkbox .in{flex:1;min-width:220px;font-size:.9rem}
+.opt{display:flex;align-items:center;gap:16px;padding:20px;border:3px solid var(--line);border-radius:18px;background:var(--card);cursor:pointer;margin-bottom:14px;font-size:1.2rem;font-weight:600;transition:border-color .12s,background .12s}
+.opt:hover{border-color:var(--brand)}
+.opt input{position:absolute;opacity:0;pointer-events:none}
+.opt .dot{width:30px;height:30px;border-radius:50%;border:3px solid var(--muted);flex:none;display:grid;place-items:center}
+.opt.sel{border-color:var(--brand);background:var(--soft)}
+.opt.sel .dot{border-color:var(--brand);background:var(--brand)}
+.opt.sel .dot::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--brand-ink)}
+.opt:focus-within{outline:3px solid var(--brand);outline-offset:2px}
+.banner{padding:12px 16px;border-radius:14px;background:var(--soft);color:var(--ink);font-size:.9rem;margin-bottom:16px}
+.banner.warn{background:var(--danger-soft);color:var(--danger)}
+.empty{text-align:center;padding:48px 16px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:14px 22px;border-radius:14px;z-index:60;max-width:90vw;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.overlay{position:fixed;inset:0;background:rgba(10,14,25,.55);display:grid;place-items:center;z-index:50;padding:16px}
+.dialog{background:var(--card);border-radius:20px;padding:26px;max-width:440px;width:100%}
+.fs{position:fixed;inset:0;background:#fff;color:#111;z-index:55;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:20px;text-align:center}
+.fs h1{font-size:clamp(1.6rem,4vw,2.6rem);margin:0;max-width:900px}
+.fs .qrbox{padding:0}
+.fs .count{font-size:1.6rem;font-weight:800;color:#3b5bdb}
+.fs .btn{background:#fff;color:#111;border-color:#ccd}
+.hide{display:none!important}
+@media(max-width:560px){html{font-size:17px}.card{padding:18px}h1{font-size:1.6rem}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div id="layer"></div>
+
+<script>
+/* ===================== CONFIG ===================== */
+const FB_CONFIG = {
+  apiKey: "AIzaSyD-FftlN1MIeOnovHnCZbE4jtR9miUz9h4",
+  authDomain: "vote-system-9bce9.firebaseapp.com",
+  projectId: "vote-system-9bce9",
+  storageBucket: "vote-system-9bce9.firebasestorage.app",
+  messagingSenderId: "680069251162",
+  appId: "1:680069251162:web:981431d7963d93caafd863"
+};
+const ALLOWED_HOSTS = ['localhost','127.0.0.1','nonthaphathr.github.io','vote-system-9bce9.firebaseapp.com','vote-system-9bce9.web.app'];
+const PALETTE = ['#3b5bdb','#1f8a5b','#e8590c','#9c36b5','#0c8599','#c2255c','#5c940d','#e67700','#495057','#1971c2'];
+const DEMO = new URLSearchParams(location.search).get('demo') === '1'
+  || typeof firebase === 'undefined' || !ALLOWED_HOSTS.includes(location.hostname);
+
+/* ===================== HELPERS ===================== */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid8 = () => Math.random().toString(36).slice(2, 8);
+const fmt = d => d ? new Date(d).toLocaleString('th-TH', {dateStyle:'medium', timeStyle:'short'}) : '-';
+const normName = n => n.trim().replace(/\s+/g, ' ');
+const voterId = n => 'n_' + normName(n).toLowerCase().replace(/\//g, '／');
+const safeName = s => s.replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 60) || 'poll';
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const lsDel = k => { try { localStorage.removeItem(k); } catch (e) {} };
+
+function toast(msg, ms = 2800) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), ms);
+}
+function askConfirm(msg, okText = 'ยืนยัน') {
+  return new Promise(res => {
+    const layer = document.getElementById('layer');
+    layer.innerHTML = `<div class="overlay"><div class="dialog" role="dialog" aria-modal="true">
+      <p style="margin-top:0;font-size:1.1rem">${esc(msg)}</p>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn" id="cNo">ยกเลิก</button><button class="btn primary" id="cYes">${esc(okText)}</button></div></div></div>`;
+    document.getElementById('cNo').onclick = () => { layer.innerHTML = ''; res(false); };
+    document.getElementById('cYes').onclick = () => { layer.innerHTML = ''; res(true); };
+    document.getElementById('cYes').focus();
+  });
+}
+
+/* ===================== STORES ===================== */
+function makeFirebaseStore() {
+  firebase.initializeApp(FB_CONFIG);
+  const auth = firebase.auth(), db = firebase.firestore();
+  const ts = () => firebase.firestore.FieldValue.serverTimestamp();
+  const dt = v => (v && v.toDate) ? v.toDate() : (v instanceof Date ? v : null);
+  const pollFrom = d => { const x = d.data(); return {id: d.id, ...x, createdAt: dt(x.createdAt)}; };
+  const votesCol = id => db.collection('polls').doc(id).collection('votes');
+  return {
+    demo: false,
+    onAuth(cb) { auth.onAuthStateChanged(u => cb(u ? {uid: u.uid, name: u.displayName || u.email, photo: u.photoURL} : null)); },
+    signIn() { return auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); },
+    signOut() { return auth.signOut(); },
+    watchMyPolls(uid, cb, err) {
+      return db.collection('polls').where('ownerUid', '==', uid).onSnapshot(s => cb(s.docs.map(pollFrom)), err);
+    },
+    watchPoll(id, cb, err) {
+      return db.collection('polls').doc(id).onSnapshot(d => cb(d.exists ? pollFrom(d) : null), err);
+    },
+    async createPoll(p) { const r = await db.collection('polls').add({...p, createdAt: ts()}); return r.id; },
+    updatePoll(id, patch) { return db.collection('polls').doc(id).update(patch); },
+    async deletePoll(id) {
+      const snap = await votesCol(id).get();
+      for (let i = 0; i < snap.docs.length; i += 400) {
+        const b = db.batch(); snap.docs.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit();
+      }
+      await db.collection('polls').doc(id).delete();
+    },
+    watchVotes(id, cb, err) {
+      return votesCol(id).onSnapshot(s => cb(s.docs.map(d => {
+        const x = d.data(); return {id: d.id, name: x.name, optionId: x.optionId, createdAt: dt(x.createdAt) || new Date()};
+      })), err);
+    },
+    addVote(pollId, vid, v) { return votesCol(pollId).doc(vid).set({name: v.name, optionId: v.optionId, createdAt: ts()}); },
+    deleteVote(pollId, vid) { return votesCol(pollId).doc(vid).delete(); }
+  };
+}
+
+function makeDemoStore() {
+  const polls = new Map(), votes = new Map(), subs = new Set();
+  let user = null, authCb = null;
+  const notify = () => subs.forEach(f => f());
+  const sub = fn => { subs.add(fn); setTimeout(fn, 0); return () => subs.delete(fn); };
+  polls.set('demo1', {id:'demo1', title:'ควรจัดกิจกรรมปีใหม่แบบไหนดี?', description:'โหวตเลือกรูปแบบที่ชอบที่สุด (ข้อมูลตัวอย่าง)',
+    options:[{id:'a',text:'เลี้ยงสังสรรค์ร่วมกัน'},{id:'b',text:'จับสลากแลกของขวัญ'},{id:'c',text:'ทำบุญตักบาตรตอนเช้า'}],
+    status:'open', ownerUid:'demo', createdAt:new Date()});
+  votes.set('demo1', new Map([
+    ['n_สมชาย', {id:'n_สมชาย', name:'สมชาย', optionId:'a', createdAt:new Date()}],
+    ['n_สมหญิง', {id:'n_สมหญิง', name:'สมหญิง', optionId:'b', createdAt:new Date()}],
+    ['n_มานะ', {id:'n_มานะ', name:'มานะ', optionId:'a', createdAt:new Date()}]]));
+  return {
+    demo: true,
+    onAuth(cb) { authCb = cb; cb(null); },
+    async signIn() { user = {uid:'demo', name:'ผู้ใช้ทดลอง', photo:''}; authCb(user); },
+    async signOut() { user = null; authCb(null); },
+    watchMyPolls(uidv, cb) { return sub(() => cb([...polls.values()].filter(p => p.ownerUid === uidv))); },
+    watchPoll(id, cb) { return sub(() => cb(polls.get(id) || null)); },
+    async createPoll(p) { const id = 'p' + uid8(); polls.set(id, {...p, id, createdAt: new Date()}); votes.set(id, new Map()); notify(); return id; },
+    async updatePoll(id, patch) { polls.set(id, {...polls.get(id), ...patch}); notify(); },
+    async deletePoll(id) { polls.delete(id); votes.delete(id); notify(); },
+    watchVotes(id, cb) { return sub(() => cb([...(votes.get(id) || new Map()).values()])); },
+    async addVote(pollId, vid, v) {
+      const m = votes.get(pollId);
+      if (!m || polls.get(pollId).status !== 'open' || m.has(vid)) { const e = new Error('denied'); e.code = 'permission-denied'; throw e; }
+      m.set(vid, {id: vid, name: v.name, optionId: v.optionId, createdAt: new Date()}); notify();
+    },
+    async deleteVote(pollId, vid) { votes.get(pollId).delete(vid); notify(); }
+  };
+}
+
+const store = DEMO ? makeDemoStore() : makeFirebaseStore();
+
+/* ===================== STATE ===================== */
+const qp = new URLSearchParams(location.search).get('poll');
+const S = {
+  view: qp ? 'voter' : 'admin', fromAdmin: false,
+  user: null, authReady: false, screen: 'list', polls: [], pollsLoaded: false,
+  pollId: null, poll: null, votes: [], tab: 'qr', draft: null,
+  v: {pollId: qp, poll: undefined, votes: [], voted: null, busy: false}
+};
+const unsub = {};
+const stop = k => { if (unsub[k]) { unsub[k](); unsub[k] = null; } };
+const onErr = e => { console.error(e); toast('เชื่อมต่อฐานข้อมูลไม่ได้: ' + (e.code || e.message)); };
+
+function pollUrl(id) {
+  if (DEMO) return 'https://example.com/?poll=' + id;
+  return location.origin + location.pathname + '?poll=' + id;
+}
+function stats(poll, votes) {
+  const opts = (poll.options || []).map((o, i) => ({id: o.id, text: o.text, color: PALETTE[i % PALETTE.length], n: 0}));
+  let other = 0;
+  votes.forEach(v => { const o = opts.find(x => x.id === v.optionId); if (o) o.n++; else other++; });
+  if (other) opts.push({id: '_x', text: '(ตัวเลือกที่ถูกลบ)', color: '#868e96', n: other});
+  const total = votes.length, max = Math.max(0, ...opts.map(o => o.n));
+  opts.forEach(o => o.pct = total ? o.n * 100 / total : 0);
+  const leaders = total ? opts.filter(o => o.n === max).map(o => o.text) : [];
+  return {opts, total, leaders};
+}
+const optText = (poll, id) => ((poll.options || []).find(o => o.id === id) || {text: '(ตัวเลือกที่ถูกลบ)'}).text;
+
+/* ===================== ADMIN FLOW ===================== */
+function startPolls() {
+  stop('polls');
+  S.pollsLoaded = false;
+  unsub.polls = store.watchMyPolls(S.user.uid, list => {
+    S.polls = list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); S.pollsLoaded = true;
+    if (S.view === 'admin' && S.screen === 'list') render();
+  }, onErr);
+}
+function openPoll(id, tab) {
+  stop('poll'); stop('votes');
+  S.pollId = id; S.screen = 'poll'; S.tab = tab || 'dash'; S.poll = S.polls.find(p => p.id === id) || null; S.votes = [];
+  unsub.poll = store.watchPoll(id, p => { S.poll = p; if (S.view === 'admin' && S.screen === 'poll') render(); }, onErr);
+  unsub.votes = store.watchVotes(id, v => { S.votes = v; if (S.view === 'admin' && S.screen === 'poll') { renderDash(); updateFs(); } }, onErr);
+  render();
+}
+function goList() { stop('poll'); stop('votes'); S.screen = 'list'; S.pollId = null; render(); }
+function newDraft() { S.draft = {id: null, title: '', description: '', options: [{id: 'o' + uid8(), text: ''}, {id: 'o' + uid8(), text: ''}]}; S.screen = 'edit'; render(); }
+function editDraft() { const p = S.poll; S.draft = {id: p.id, title: p.title, description: p.description || '', options: p.options.map(o => ({...o}))}; S.screen = 'edit'; render(); }
+
+async function saveDraft() {
+  const d = S.draft, title = d.title.trim(), options = d.options.map(o => ({id: o.id, text: o.text.trim()})).filter(o => o.text);
+  if (!title) return toast('กรุณาใส่คำถามหรือหัวข้อโหวต');
+  if (options.length < 2) return toast('ต้องมีตัวเลือกอย่างน้อย 2 ข้อ');
+  try {
+    if (d.id) { await store.updatePoll(d.id, {title, description: d.description.trim(), options}); toast('บันทึกแล้ว'); openPoll(d.id, 'dash'); }
+    else {
+      const id = await store.createPoll({title, description: d.description.trim(), options, status: 'open', ownerUid: S.user.uid, ownerName: S.user.name || ''});
+      toast('สร้างโหวตแล้ว'); openPoll(id, 'qr');
+    }
+  } catch (e) { onErr(e); }
+}
+
+/* ===================== VOTER FLOW ===================== */
+function startVoter(id) {
+  stop('vpoll'); stop('vvotes');
+  S.view = 'voter'; S.v = {pollId: id, poll: undefined, votes: [], voted: null, busy: false};
+  const saved = lsGet('voted_' + id);
+  if (saved) { try { S.v.voted = JSON.parse(saved); } catch (e) {} }
+  unsub.vpoll = store.watchPoll(id, p => { S.v.poll = p; if (S.view === 'voter') render(); }, e => { S.v.poll = null; onErr(e); render(); });
+  render();
+}
+function watchResults() {
+  if (unsub.vvotes) return;
+  unsub.vvotes = store.watchVotes(S.v.pollId, v => { S.v.votes = v; const r = document.getElementById('vres'); if (r) r.innerHTML = barsHTML(S.v.poll, v); }, onErr);
+}
+async function submitVote() {
+  const name = normName(document.getElementById('vname').value);
+  const sel = document.querySelector('input[name=opt]:checked');
+  if (!name || !sel || S.v.busy) return;
+  S.v.busy = true; const btn = document.getElementById('vgo'); btn.disabled = true; btn.textContent = 'กำลังส่งโหวต...';
+  try {
+    await store.addVote(S.v.pollId, voterId(name), {name, optionId: sel.value});
+    S.v.voted = {name, optionId: sel.value}; lsSet('voted_' + S.v.pollId, JSON.stringify(S.v.voted));
+  } catch (e) {
+    console.error(e);
+    toast(e.code === 'permission-denied' ? 'ชื่อนี้โหวตไปแล้ว หรือโหวตนี้ปิดรับแล้ว' : 'ส่งโหวตไม่สำเร็จ ลองใหม่อีกครั้ง', 4000);
+  }
+  S.v.busy = false; render();
+}
+
+/* ===================== RENDER ===================== */
+const app = document.getElementById('app');
+
+function headerHTML() {
+  const u = S.user;
+  return `<header class="top"><div class="brand"><span class="logo" aria-hidden="true">✓</span><span>ระบบโหวต</span></div>
+    ${u && S.view === 'admin' ? `<div class="chip">${u.photo ? `<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">` : ''}<span>${esc(u.name)}</span><button class="btn sm" data-act="signout">ออกจากระบบ</button></div>` : ''}</header>`;
+}
+const demoBanner = () => DEMO ? `<div class="banner">โหมดสาธิต: ข้อมูลอยู่ในหน้านี้เท่านั้น ระบบจริงจะเชื่อม Firebase เมื่อเปิดจากโดเมนที่อนุญาต (เช่น nonthaphathr.github.io)</div>` : '';
+
+function render() {
+  if (S.view === 'voter') return renderVoter();
+  if (!S.authReady) { app.innerHTML = headerHTML() + '<div class="empty">กำลังโหลด...</div>'; return; }
+  if (!S.user) return renderLogin();
+  if (S.screen === 'edit') return renderEditor();
+  if (S.screen === 'poll') return renderPoll();
+  renderList();
+}
+
+function renderLogin() {
+  app.innerHTML = headerHTML() + demoBanner() + `<div class="card center" style="max-width:560px;margin:40px auto">
+    <h1>สร้างโหวตง่าย ๆ ในไม่กี่นาที</h1>
+    <p class="lead">ตั้งคำถาม แชร์ QR ให้ทุกคนสแกนโหวต แล้วดูผลสรุปได้ทันที</p>
+    <button class="btn primary big" data-act="signin">เข้าสู่ระบบด้วย Google</button></div>`;
+}
+
+function renderList() {
+  const cards = S.polls.map(p => `<button class="pollcard" data-act="open" data-id="${esc(p.id)}">
+    <span class="badge ${p.status === 'open' ? 'open' : 'closed'}">${p.status === 'open' ? 'เปิดรับโหวต' : 'ปิดรับโหวต'}</span>
+    <h3>${esc(p.title)}</h3><small>สร้างเมื่อ ${fmt(p.createdAt)} · ${p.options.length} ตัวเลือก</small></button>`).join('');
+  app.innerHTML = headerHTML() + demoBanner() + `<div class="row between" style="margin-bottom:18px"><h1 style="margin:0">โหวตของฉัน</h1>
+    <button class="btn primary big" data-act="new">+ สร้างโหวตใหม่</button></div>` +
+    (!S.pollsLoaded ? '<div class="empty">กำลังโหลด...</div>' : S.polls.length ? `<div class="grid">${cards}</div>` :
+      `<div class="card empty"><h2>ยังไม่มีโหวต</h2><p>กดปุ่ม “สร้างโหวตใหม่” เพื่อเริ่มต้น</p></div>`);
+}
+
+function renderEditor() {
+  const d = S.draft;
+  const opts = d.options.map((o, i) => `<div class="optrow"><span class="num">${i + 1}</span>
+    <input class="in" data-opt="${i}" maxlength="120" placeholder="ตัวเลือกที่ ${i + 1}" value="${esc(o.text)}" aria-label="ตัวเลือกที่ ${i + 1}">
+    <button class="btn sm danger" data-act="rmopt" data-i="${i}" ${d.options.length <= 2 ? 'disabled' : ''} aria-label="ลบตัวเลือก">ลบ</button></div>`).join('');
+  app.innerHTML = headerHTML() + `<div class="card"><h1>${d.id ? 'แก้ไขโหวต' : 'สร้างโหวตใหม่'}</h1>
+    <div class="field"><label class="f" for="dTitle">คำถาม / หัวข้อโหวต</label>
+      <input class="in" id="dTitle" maxlength="150" placeholder="เช่น วันเที่ยวประจำปีควรไปที่ไหน?" value="${esc(d.title)}"></div>
+    <div class="field"><label class="f" for="dDesc">รายละเอียดเพิ่มเติม (ไม่บังคับ)</label>
+      <textarea class="in" id="dDesc" maxlength="400" placeholder="อธิบายสั้น ๆ ให้ผู้โหวตเข้าใจ">${esc(d.description)}</textarea></div>
+    <label class="f">ประเด็นให้เลือกโหวต</label>${opts}
+    <button class="btn" data-act="addopt" ${d.options.length >= 10 ? 'disabled' : ''}>+ เพิ่มตัวเลือก</button>
+    ${d.id ? '<div class="banner" style="margin-top:16px">หากลบตัวเลือกที่มีคนโหวตแล้ว คะแนนนั้นจะไปรวมในหัวข้อ “ตัวเลือกที่ถูกลบ”</div>' : ''}
+    <div class="row" style="margin-top:24px"><button class="btn primary big" data-act="savedraft">${d.id ? 'บันทึกการแก้ไข' : 'สร้างโหวต'}</button>
+      <button class="btn big" data-act="${d.id ? 'back-poll' : 'back-list'}">ยกเลิก</button></div></div>`;
+}
+
+function renderPoll() {
+  const p = S.poll;
+  if (!p) { app.innerHTML = headerHTML() + '<div class="empty">กำลังโหลด...</div><div class="center"><button class="btn" data-act="back-list">← กลับ</button></div>'; return; }
+  const tabs = [['qr', 'QR สำหรับโหวต'], ['dash', 'Dashboard สรุปผล'], ['set', 'ตั้งค่า']]
+    .map(([k, t]) => `<button class="tab" role="tab" aria-selected="${S.tab === k}" data-act="tab" data-tab="${k}">${t}</button>`).join('');
+  app.innerHTML = headerHTML() + demoBanner() + `<button class="btn sm" data-act="back-list" style="margin-bottom:14px">← โหวตทั้งหมด</button>
+    <div class="row between" style="margin-bottom:6px"><h1 style="margin:0;flex:1;min-width:240px">${esc(p.title)}</h1>
+      <span class="badge ${p.status === 'open' ? 'open' : 'closed'}">${p.status === 'open' ? 'เปิดรับโหวต' : 'ปิดรับโหวต'}</span></div>
+    ${p.description ? `<p class="lead">${esc(p.description)}</p>` : '<div style="height:12px"></div>'}
+    <div class="tabs" role="tablist">${tabs}</div><div id="tabBody"></div>`;
+  if (S.tab === 'qr') renderQrTab(); else if (S.tab === 'dash') renderDash(); else renderSetTab();
+}
+
+function renderQrTab() {
+  const p = S.poll, url = pollUrl(p.id);
+  document.getElementById('tabBody').innerHTML = `<div class="card center">
+    <h2>ให้ผู้โหวตสแกนด้วยมือถือ</h2>
+    <p class="lead">สแกนแล้วพิมพ์ชื่อ เลือกตัวเลือก และกดโหวตได้เลย</p>
+    <div class="qrbox" id="qr"></div>
+    <div class="linkbox" style="margin:22px 0 14px"><input class="in" id="lnk" readonly value="${esc(url)}" aria-label="ลิงก์โหวต">
+      <button class="btn" data-act="copy">คัดลอกลิงก์</button></div>
+    <div class="row" style="justify-content:center">
+      <button class="btn primary" data-act="fs">แสดง QR เต็มจอ</button>
+      <button class="btn" data-act="dlqr">ดาวน์โหลด QR (PNG)</button>
+      <button class="btn" data-act="tryvote">ทดลองหน้าโหวต</button></div>
+    ${DEMO ? '<p class="lead" style="margin-top:14px;font-size:.85rem">โหมดสาธิต: QR นี้เป็นตัวอย่าง ใช้งานจริงได้เมื่อเปิดจากโดเมนที่ deploy แล้ว</p>' : ''}</div>`;
+  new QRCode(document.getElementById('qr'), {text: url, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.M});
+}
+
+function barsHTML(poll, votes) {
+  const s = stats(poll, votes);
+  return s.opts.map(o => `<div class="bar"><div class="top"><span>${esc(o.text)}</span><span>${o.n} คะแนน <span class="pct">(${o.pct.toFixed(1)}%)</span></span></div>
+    <div class="track"><div class="fill" style="width:${o.pct}%;background:${o.color}"></div></div></div>`).join('');
+}
+
+function renderDash() {
+  const body = document.getElementById('tabBody');
+  if (S.tab !== 'dash' || !body || !S.poll) return;
+  const p = S.poll, s = stats(p, S.votes);
+  const rows = [...S.votes].sort((a, b) => b.createdAt - a.createdAt).map((v, i) => `<tr><td>${S.votes.length - i}</td><td>${esc(v.name)}</td>
+    <td>${esc(optText(p, v.optionId))}</td><td>${fmt(v.createdAt)}</td>
+    <td><button class="btn sm danger" data-act="delvote" data-id="${esc(v.id)}" aria-label="ลบคะแนนของ ${esc(v.name)}">ลบ</button></td></tr>`).join('');
+  body.innerHTML = `<div class="stats">
+      <div class="stat"><div class="k">ผู้ร่วมโหวตทั้งหมด</div><div class="v">${s.total}</div></div>
+      <div class="stat"><div class="k">ตัวเลือกที่นำอยู่</div><div class="v sm">${s.leaders.length ? esc(s.leaders.join(' / ')) : '-'}</div></div>
+      <div class="stat"><div class="k">สถานะ</div><div class="v sm">${p.status === 'open' ? 'เปิดรับโหวต' : 'ปิดรับโหวต'}</div></div></div>
+    <div class="card"><div class="row between" style="margin-bottom:12px"><h2 style="margin:0">ผลโหวต</h2>
+      <div class="row"><button class="btn primary sm" data-act="pdf">ดาวน์โหลด PDF</button><button class="btn sm" data-act="xlsx">ดาวน์โหลด Excel (.xlsx)</button></div></div>
+      ${barsHTML(p, S.votes)}</div>
+    <div class="card"><h2>รายชื่อผู้โหวต</h2>
+      ${S.votes.length ? `<div style="overflow-x:auto"><table class="t"><thead><tr><th>#</th><th>ชื่อ</th><th>เลือก</th><th>เวลา</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : '<div class="empty">ยังไม่มีผู้โหวต</div>'}</div>`;
+}
+
+function renderSetTab() {
+  const p = S.poll;
+  document.getElementById('tabBody').innerHTML = `<div class="card"><h2>ตั้งค่าโหวต</h2>
+    <div class="row"><button class="btn" data-act="edit">แก้ไขคำถามและตัวเลือก</button>
+      <button class="btn" data-act="toggle">${p.status === 'open' ? 'ปิดรับโหวต' : 'เปิดรับโหวตอีกครั้ง'}</button>
+      <button class="btn danger" data-act="delpoll">ลบโหวตนี้</button></div></div>`;
+}
+
+function renderVoter() {
+  const v = S.v, p = v.poll;
+  const back = S.fromAdmin ? `<button class="btn sm" data-act="vback" style="margin-bottom:12px">← กลับหน้าผู้จัด</button>` : '';
+  const head = `<header class="top"><div class="brand"><span class="logo" aria-hidden="true">✓</span><span>ระบบโหวต</span></div></header>${back}`;
+  if (p === undefined) { app.innerHTML = head + '<div class="empty">กำลังโหลด...</div>'; return; }
+  if (p === null) { app.innerHTML = head + '<div class="card empty"><h2>ไม่พบโหวตนี้</h2><p>ลิงก์อาจไม่ถูกต้อง หรือโหวตถูกลบแล้ว</p></div>'; return; }
+  const closed = p.status !== 'open';
+  if (v.voted || closed) {
+    app.innerHTML = head + `<div class="card"><h1>${esc(p.title)}</h1>
+      ${v.voted ? `<div class="banner" style="font-size:1.05rem">ขอบคุณ คุณ${esc(v.voted.name)} · คุณโหวต “${esc(optText(p, v.voted.optionId))}” เรียบร้อยแล้ว</div>` : ''}
+      ${closed ? '<div class="banner warn">โหวตนี้ปิดรับแล้ว</div>' : ''}
+      <h2>ผลโหวตขณะนี้</h2><div id="vres">${barsHTML(p, v.votes)}</div>
+      ${v.voted && !closed ? '<button class="btn sm" data-act="revote">โหวตในชื่อคนอื่นบนเครื่องนี้</button>' : ''}</div>`;
+    watchResults(); return;
+  }
+  const opts = p.options.map(o => `<label class="opt"><input type="radio" name="opt" value="${esc(o.id)}"><span class="dot" aria-hidden="true"></span><span>${esc(o.text)}</span></label>`).join('');
+  app.innerHTML = head + `<div class="card"><h1>${esc(p.title)}</h1>${p.description ? `<p class="lead">${esc(p.description)}</p>` : ''}
+    <div class="field" style="margin-top:18px"><label class="f" for="vname">ชื่อของคุณ</label>
+      <input class="in" id="vname" maxlength="60" autocomplete="name" placeholder="พิมพ์ชื่อ-นามสกุล หรือชื่อเล่น" style="min-height:64px;font-size:1.2rem"></div>
+    <label class="f">เลือกคำตอบของคุณ</label>${opts}
+    <button class="btn primary big" id="vgo" data-act="vote" style="width:100%;margin-top:8px" disabled>กดโหวต</button></div>`;
+}
+
+/* ===================== EXPORT ===================== */
+function exportXLSX() {
+  const p = S.poll, s = stats(p, S.votes), now = fmt(new Date());
+  const sum = [['คำถาม', p.title], ['ผู้ร่วมโหวตทั้งหมด', s.total], ['ส่งออกเมื่อ', now], [], ['ตัวเลือก', 'คะแนน', 'ร้อยละ (%)']];
+  s.opts.forEach(o => sum.push([o.text, o.n, Math.round(o.pct * 10) / 10]));
+  const voters = [['ลำดับ', 'ชื่อ', 'ตัวเลือกที่เลือก', 'เวลาโหวต']];
+  [...S.votes].sort((a, b) => a.createdAt - b.createdAt).forEach((v, i) => voters.push([i + 1, v.name, optText(p, v.optionId), fmt(v.createdAt)]));
+  const wb = XLSX.utils.book_new(), w1 = XLSX.utils.aoa_to_sheet(sum), w2 = XLSX.utils.aoa_to_sheet(voters);
+  w1['!cols'] = [{wch: 36}, {wch: 14}, {wch: 14}]; w2['!cols'] = [{wch: 8}, {wch: 28}, {wch: 32}, {wch: 24}];
+  XLSX.utils.book_append_sheet(wb, w1, 'สรุปผล'); XLSX.utils.book_append_sheet(wb, w2, 'รายชื่อผู้โหวต');
+  XLSX.writeFile(wb, `ผลโหวต_${safeName(p.title)}.xlsx`);
+}
+
+async function exportPDF() {
+  const p = S.poll, s = stats(p, S.votes);
+  toast('กำลังสร้าง PDF...', 1800);
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;color:#111;padding:48px;font-family:"Noto Sans Thai",sans-serif;font-size:15px;line-height:1.6';
+  const bars = s.opts.map(o => `<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-weight:600"><span>${esc(o.text)}</span><span>${o.n} คะแนน (${o.pct.toFixed(1)}%)</span></div>
+    <div style="height:20px;background:#eceff5;border-radius:6px;overflow:hidden"><div style="height:100%;width:${o.pct}%;background:${o.color}"></div></div></div>`).join('');
+  const rows = [...S.votes].sort((a, b) => a.createdAt - b.createdAt).map((v, i) => `<tr><td style="padding:6px;border-bottom:1px solid #ddd">${i + 1}</td>
+    <td style="padding:6px;border-bottom:1px solid #ddd">${esc(v.name)}</td><td style="padding:6px;border-bottom:1px solid #ddd">${esc(optText(p, v.optionId))}</td>
+    <td style="padding:6px;border-bottom:1px solid #ddd">${fmt(v.createdAt)}</td></tr>`).join('');
+  el.innerHTML = `<div style="font-size:26px;font-weight:800">สรุปผลโหวต</div><div style="font-size:20px;font-weight:600;margin-top:4px">${esc(p.title)}</div>
+    ${p.description ? `<div style="color:#555">${esc(p.description)}</div>` : ''}
+    <div style="color:#555;margin:6px 0 18px">ส่งออกเมื่อ ${fmt(new Date())} · ผู้ร่วมโหวตทั้งหมด ${s.total} คน${s.leaders.length ? ' · นำอยู่: ' + esc(s.leaders.join(' / ')) : ''}</div>
+    ${bars}<div style="font-size:18px;font-weight:800;margin:24px 0 8px">รายชื่อผู้โหวต</div>
+    <table style="width:100%;border-collapse:collapse"><thead><tr style="text-align:left;background:#f1f3f9"><th style="padding:6px">ลำดับ</th><th style="padding:6px">ชื่อ</th><th style="padding:6px">เลือก</th><th style="padding:6px">เวลา</th></tr></thead><tbody>${rows}</tbody></table>`;
+  document.body.appendChild(el);
+  try {
+    await document.fonts.ready;
+    const canvas = await html2canvas(el, {scale: 2, backgroundColor: '#ffffff'});
+    const {jsPDF} = window.jspdf, pdf = new jsPDF('p', 'mm', 'a4'), pw = 210, ph = 297;
+    const pagePx = Math.floor(canvas.width * ph / pw);
+    for (let y = 0, page = 0; y < canvas.height; y += pagePx, page++) {
+      const sl = document.createElement('canvas'); sl.width = canvas.width; sl.height = Math.min(pagePx, canvas.height - y);
+      const c = sl.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, sl.width, sl.height);
+      c.drawImage(canvas, 0, y, canvas.width, sl.height, 0, 0, canvas.width, sl.height);
+      if (page) pdf.addPage();
+      pdf.addImage(sl.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pw, sl.height * pw / canvas.width);
+    }
+    pdf.save(`ผลโหวต_${safeName(p.title)}.pdf`);
+  } catch (e) { console.error(e); toast('สร้าง PDF ไม่สำเร็จ'); }
+  el.remove();
+}
+
+/* ===================== QR FULLSCREEN / DOWNLOAD ===================== */
+function showFs() {
+  const p = S.poll, url = pollUrl(p.id), layer = document.getElementById('layer');
+  layer.innerHTML = `<div class="fs"><h1>${esc(p.title)}</h1><p style="margin:0;font-size:1.2rem">สแกน QR ด้วยมือถือเพื่อโหวต</p>
+    <div class="qrbox" id="fsqr"></div><div class="count">โหวตแล้ว <span id="fsCount">${S.votes.length}</span> คน</div>
+    <button class="btn" data-act="fsclose">ปิด</button></div>`;
+  new QRCode(document.getElementById('fsqr'), {text: url, width: 420, height: 420, correctLevel: QRCode.CorrectLevel.M});
+}
+function updateFs() { const c = document.getElementById('fsCount'); if (c) c.textContent = S.votes.length; }
+function downloadQr() {
+  const box = document.getElementById('qr'), cv = box.querySelector('canvas'), im = box.querySelector('img');
+  const href = cv ? cv.toDataURL('image/png') : im.src;
+  const a = document.createElement('a'); a.href = href; a.download = `QR_${safeName(S.poll.title)}.png`; a.click();
+}
+
+/* ===================== EVENTS ===================== */
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const a = t.dataset.act;
+  switch (a) {
+    case 'signin': try { await store.signIn(); } catch (er) { toast(er.code === 'auth/unauthorized-domain' ? 'โดเมนนี้ยังไม่ได้อนุญาตใน Firebase' : 'เข้าสู่ระบบไม่สำเร็จ: ' + (er.code || er.message), 4000); } break;
+    case 'signout': stop('polls'); stop('poll'); stop('votes'); S.screen = 'list'; await store.signOut(); break;
+    case 'new': newDraft(); break;
+    case 'open': openPoll(t.dataset.id, 'dash'); break;
+    case 'back-list': goList(); break;
+    case 'back-poll': S.screen = 'poll'; render(); break;
+    case 'addopt': S.draft.options.push({id: 'o' + uid8(), text: ''}); render(); { const ins = document.querySelectorAll('[data-opt]'); ins[ins.length - 1].focus(); } break;
+    case 'rmopt': S.draft.options.splice(+t.dataset.i, 1); render(); break;
+    case 'savedraft': saveDraft(); break;
+    case 'tab': S.tab = t.dataset.tab; render(); break;
+    case 'copy':
+      try { await navigator.clipboard.writeText(document.getElementById('lnk').value); toast('คัดลอกลิงก์แล้ว'); }
+      catch (er) { const i = document.getElementById('lnk'); i.select(); toast('กดคัดลอกจากช่องลิงก์ได้เลย'); } break;
+    case 'fs': showFs(); break;
+    case 'fsclose': document.getElementById('layer').innerHTML = ''; break;
+    case 'dlqr': downloadQr(); break;
+    case 'tryvote': S.fromAdmin = true; startVoter(S.poll.id); break;
+    case 'vback': stop('vpoll'); stop('vvotes'); S.fromAdmin = false; S.view = 'admin'; render(); break;
+    case 'pdf': exportPDF(); break;
+    case 'xlsx': exportXLSX(); break;
+    case 'delvote':
+      if (await askConfirm('ลบคะแนนของผู้โหวตคนนี้?', 'ลบ')) { try { await store.deleteVote(S.pollId, t.dataset.id); } catch (er) { onErr(er); } } break;
+    case 'edit': editDraft(); break;
+    case 'toggle':
+      try { await store.updatePoll(S.pollId, {status: S.poll.status === 'open' ? 'closed' : 'open'}); toast('อัปเดตสถานะแล้ว'); } catch (er) { onErr(er); } break;
+    case 'delpoll':
+      if (await askConfirm('ลบโหวตนี้และคะแนนทั้งหมด? การลบกู้คืนไม่ได้', 'ลบถาวร')) {
+        const id = S.pollId; stop('poll'); stop('votes');
+        try { await store.deletePoll(id); toast('ลบโหวตแล้ว'); goList(); } catch (er) { onErr(er); }
+      } break;
+    case 'vote': submitVote(); break;
+    case 'revote': lsDel('voted_' + S.v.pollId); S.v.voted = null; render(); break;
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'dTitle') S.draft.title = t.value;
+  else if (t.id === 'dDesc') S.draft.description = t.value;
+  else if (t.dataset && t.dataset.opt !== undefined) S.draft.options[+t.dataset.opt].text = t.value;
+  else if (t.id === 'vname') syncVoteBtn();
+});
+document.addEventListener('change', e => {
+  if (e.target.name === 'opt') {
+    document.querySelectorAll('.opt').forEach(l => l.classList.toggle('sel', l.querySelector('input').checked));
+    syncVoteBtn();
+  }
+});
+function syncVoteBtn() {
+  const b = document.getElementById('vgo'); if (!b) return;
+  b.disabled = !(normName(document.getElementById('vname').value) && document.querySelector('input[name=opt]:checked'));
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('layer').innerHTML = ''; });
+
+/* ===================== START ===================== */
+store.onAuth(u => {
+  S.user = u; S.authReady = true;
+  if (u) startPolls(); else { stop('polls'); S.polls = []; }
+  if (S.view === 'admin') render();
+});
+if (S.view === 'voter') startVoter(qp); else render();
+</script>
+</body>
+</html>
